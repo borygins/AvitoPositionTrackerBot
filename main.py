@@ -1,3 +1,5 @@
+import os
+from dotenv import load_dotenv
 import requests
 from bs4 import BeautifulSoup
 from fake_useragent import UserAgent
@@ -20,8 +22,15 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+load_dotenv()
+logger.info("Загружены переменные окружения из .env файла")
+
 # Конфигурация
-TOKEN = "BOT_TOKEN"  # Замените на свой токен
+TOKEN = os.getenv("BOT_TOKEN") # Замените на свой токен
+if not TOKEN:
+	logger.error("BOT_TOKEN не задан в .env файле")
+	raise Exception("BOT_TOKEN не задан в .env файле")
+
 REGIONS = [
     "sankt-peterburg_i_lo",  # СПб и ЛО
     "sankt-peterburg"  # Только СПб

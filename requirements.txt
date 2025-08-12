@@ -2,3 +2,4 @@ requests
 beautifulsoup4
 fake-useragent
 python-telegram-bot
+dotenv
