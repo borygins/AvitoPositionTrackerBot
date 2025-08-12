@@ -4,7 +4,7 @@ from fake_useragent import UserAgent
 import time
 from datetime import datetime
 from telegram import Bot, Update
-from telegram.ext import CommandHandler, Updater, MessageHandler, Filters
+from telegram.ext import CommandHandler, Updater, MessageHandler, filters
 import logging
 
 # Настройка логирования
@@ -15,7 +15,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # Конфигурация
-TOKEN = "ВАШ_TELEGRAM_BOT_TOKEN"  # Замените на свой токен
+TOKEN = "BOT_TOKEN"  # Замените на свой токен
 REGIONS = [
     "sankt-peterburg_i_lo",  # СПб и ЛО
     "sankt-peterburg"  # Только СПб
@@ -283,7 +283,7 @@ def main():
     dp.add_handler(CommandHandler("start", start))
     dp.add_handler(CommandHandler("set_ad_id", set_ad_id, pass_args=True))
     dp.add_handler(CommandHandler("check", check))
-    dp.add_handler(MessageHandler(Filters.text & ~Filters.command, handle_queries))
+    dp.add_handler(MessageHandler(filters.text & ~filters.command, handle_queries))
     dp.add_error_handler(error_handler)
 
     # Запуск
