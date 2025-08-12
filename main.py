@@ -3,8 +3,14 @@ from bs4 import BeautifulSoup
 from fake_useragent import UserAgent
 import time
 from datetime import datetime
-from telegram import Bot, Update
-from telegram.ext import CommandHandler, Updater, MessageHandler, filters
+from telegram import Update
+from telegram.ext import (
+    Application,
+    CommandHandler,
+    MessageHandler,
+    ContextTypes,
+    filters
+)
 import logging
 
 # Настройка логирования
@@ -107,7 +113,7 @@ def get_region_name(region_code):
     return names.get(region_code, region_code)
 
 
-def start(update: Update, context):
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Обработчик команды /start"""
     user = update.effective_user
     help_text = (
@@ -123,33 +129,33 @@ def start(update: Update, context):
         "<code>макияж и прическа\n"
         "визажист с выездом</code>"
     )
-    update.message.reply_text(help_text, parse_mode="HTML")
+    await update.message.reply_text(help_text, parse_mode="HTML")
 
 
-def set_ad_id(update: Update, context):
+async def set_ad_id(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Устанавливает ID объявления для пользователя"""
     user_id = update.effective_user.id
     args = context.args
 
     if not args:
-        update.message.reply_text("❌ Укажите ID объявления после команды\nПример: /set_ad_id 2140172843")
+        await update.message.reply_text("❌ Укажите ID объявления после команды\nПример: /set_ad_id 2140172843")
         return
 
     ad_id = args[0]
     user_data[user_id] = {'ad_id': ad_id}
-    update.message.reply_text(f"✅ ID объявления установлен: {ad_id}\nОтправь /check для запуска проверки")
+    await update.message.reply_text(f"✅ ID объявления установлен: {ad_id}\nОтправь /check для запуска проверки")
 
 
-def check(update: Update, context):
+async def check(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Начинает процесс проверки позиций"""
     user_id = update.effective_user.id
 
     # Проверка установки ID объявления
     if user_id not in user_data or 'ad_id' not in user_data[user_id]:
-        update.message.reply_text("❌ Сначала установите ID объявления командой /set_ad_id")
+        await update.message.reply_text("❌ Сначала установите ID объявления командой /set_ad_id")
         return
 
-    update.message.reply_text(
+    await update.message.reply_text(
         "📝 Введите ключевые запросы для поиска (каждый с новой строки):\n"
         "• Максимум 10 запросов\n"
         "• Каждый запрос будет проверен в двух регионах\n\n"
@@ -163,7 +169,7 @@ def check(update: Update, context):
     user_data[user_id]['awaiting_queries'] = True
 
 
-def handle_queries(update: Update, context):
+async def handle_queries(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Обрабатывает введенные пользователем запросы"""
     user_id = update.effective_user.id
     user = update.effective_user
@@ -178,10 +184,10 @@ def handle_queries(update: Update, context):
     # Ограничиваем количество запросов
     if len(queries) > MAX_QUERIES:
         queries = queries[:MAX_QUERIES]
-        update.message.reply_text(f"⚠️ Принято первых {MAX_QUERIES} запросов")
+        await update.message.reply_text(f"⚠️ Принято первых {MAX_QUERIES} запросов")
 
     if not queries:
-        update.message.reply_text("❌ Не получено ни одного запроса. Попробуйте снова.")
+        await update.message.reply_text("❌ Не получено ни одного запроса. Попробуйте снова.")
         return
 
     # Сохраняем запросы и сбрасываем флаг
@@ -189,14 +195,14 @@ def handle_queries(update: Update, context):
     user_data[user_id]['awaiting_queries'] = False
 
     # Начинаем проверку
-    update.message.reply_text(
+    await update.message.reply_text(
         f"🔍 Начинаю проверку {len(queries)} запросов в 2 регионах для {user.first_name}...\n"
         f"⏱ Ориентировочное время: {len(queries) * 2 * 25 // 60} минут"
     )
-    process_queries(update, user_id)
+    await process_queries(update, user_id)
 
 
-def process_queries(update: Update, user_id):
+async def process_queries(update: Update, user_id):
     """Обрабатывает все запросы пользователя с задержками"""
     try:
         target_id = user_data[user_id]['ad_id']
@@ -218,7 +224,7 @@ def process_queries(update: Update, user_id):
                     f"• Запрос: {query}\n"
                     f"• Регион: {region_name}"
                 )
-                update.message.reply_text(status)
+                await update.message.reply_text(status)
 
                 # Получаем страницу
                 html = fetch_avito_page(query, region)
@@ -255,7 +261,7 @@ def process_queries(update: Update, user_id):
             f"🆔 *ID объявления:* `{target_id}`\n"
             f"⏱ *Общее время проверки:* {datetime.now().strftime('%H:%M:%S')}"
         )
-        update.message.reply_text(
+        await update.message.reply_text(
             final_report,
             parse_mode="Markdown",
             disable_web_page_preview=True
@@ -263,33 +269,30 @@ def process_queries(update: Update, user_id):
 
     except Exception as e:
         logger.error(f"Ошибка обработки запросов: {e}", exc_info=True)
-        update.message.reply_text(f"⚠️ Произошла ошибка: {str(e)}")
+        await update.message.reply_text(f"⚠️ Произошла ошибка: {str(e)}")
 
 
-def error_handler(update: Update, context):
+async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE):
     """Обработчик ошибок"""
     logger.error(f"Ошибка: {context.error}", exc_info=True)
-    if update.effective_message:
-        update.effective_message.reply_text("⚠️ Произошла непредвиденная ошибка. Попробуйте позже.")
+    if isinstance(update, Update) and update.effective_message:
+        await update.effective_message.reply_text("⚠️ Произошла непредвиденная ошибка. Попробуйте позже.")
 
 
 def main():
     """Запуск бота"""
-    bot = Bot(token=TOKEN)
-    updater = Updater(bot=bot, use_context=True)
-    dp = updater.dispatcher
+    application = Application.builder().token(TOKEN).build()
 
     # Регистрация обработчиков
-    dp.add_handler(CommandHandler("start", start))
-    dp.add_handler(CommandHandler("set_ad_id", set_ad_id, pass_args=True))
-    dp.add_handler(CommandHandler("check", check))
-    dp.add_handler(MessageHandler(filters.text & ~filters.command, handle_queries))
-    dp.add_error_handler(error_handler)
+    application.add_handler(CommandHandler("start", start))
+    application.add_handler(CommandHandler("set_ad_id", set_ad_id))
+    application.add_handler(CommandHandler("check", check))
+    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_queries))
+    application.add_error_handler(error_handler)
 
     # Запуск
     logger.info("🤖 Бот запущен. Режим двух регионов: СПб и СПб+ЛО")
-    updater.start_polling()
-    updater.idle()
+    application.run_polling()
 
 
 if __name__ == "__main__":
